@@ -1,0 +1,414 @@
+---
+title: "Storm Data Analysis"
+author: "Teja Sharwin Vaddavalli"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_width: 6
+    fig_height: 4
+---
+
+```{r, include = FALSE}
+# Load the data (you will need to edit this to point to the correct directory
+# on your computer)
+load(file = "C:/wm.Rdata")
+load(file = "C:/pot.Rdata")
+library("evd", lib.loc="~/R/win-library/3.5")
+library("ismev",lib.loc="~/R/win-library/3.5")
+library("revdbayes",lib.loc="~/R/win-library/3.5")
+library("threshr",lib.loc="~/R/win-library/3.5")
+library("mev",lib.loc="~/R/win-library/3.5")
+library("ggplot2", lib.loc="~/R/win-library/3.5")
+library("gridExtra", lib.loc="~/R/win-library/3.5")
+source('C:/pjnfunctions.R')
+set.seed(17)
+```
+
+---
+
+# Extremal Types Example
+
+${}$\hspace*{\fill} [25]
+
+---
+
+# Exploratory analysis
+
+## Winter maxima (wm)
+
+```{r}
+# Figure captioning key: (1) = Figure 1
+#
+# renamed columns to avoid confusion about meaning of Hs for the two datasets.
+colnames(wm)[1] <-"M.winter"
+colnames(pot)[1] <-"M.storm"
+```
+
+```{r,echo=FALSE,fig.height=9,fig.width=10.5}
+par(mfrow=c(2,2))
+boxplot(wm$M.winter, main = "Summary of Hs winter maximums (1)", cex.main = 1.5, xlab = "Hs winter maximum / m", cex.lab = 1.25 , horizontal = T, col = "dodgerblue1");box(lwd=2)
+#
+plot(wm$waterYear,wm$M.winter,pch = 16, main = "Hs maximums over winters (2)", cex.main = 1.5, xlab = "Water year", ylab = "Hs winter maximum / m",  cex.lab = 1.25, col= "blue");box(lwd=2);abline(h= mean(wm$M.winter))
+#
+{plot(wm$meanNAO,wm$M.winter, pch = 16, main = "mean AO index vs Max Hs (3)", cex.main = 1.5,xlab = "Index value",ylab = "Hs winter maximum / m",cex.lab = 1.25, col = "blue");box(lwd=2);text( x= -0.4, y = 14.5, label= paste('Cor =',round(cor(wm$M.winter, wm$meanA0),2)), font = 3, cex = 0.9)}
+#
+plot(wm$waterYear,wm$meanA0, pch = 16, main = "AO index means over winters (4)", cex.main = 1.5, ylab = "Index value", xlab = "Water year", cex.lab = 1.25, col= "blue");box(lwd=2);abline(h= mean(wm$meanA0))
+```
+
+Figure 1:
+
+* The boxplot reveals slight positive skewness as a consequence of the slighly longer whisker on the RHS.
+* Around 25% of the Hs winter maximums are above 12.50 metres. In addition, only one Hs winter maximum is above 15m, this is the highest Hs winter maximum in the dataset and it occured in the wateryear 1983.
+
+Figures 2 and 4:
+
+* Figure 2 shows the data points to be fairly scattered across the wateryears and an equal amount of Hs winter maximums to be above and below the sample mean (11.81 m). There doesn't seem to be clear evidence of the level of winter Hs maximums changing linearly over the observation period.  
+* Figure 4 is placed below Figure 2 for ease of comparision. AO means seem to deviate from the sample mean until around 1980 and then cluster near the sample mean just before 1990. Thereafter, we see some evidence of Hs winter maximums matching the movements of AO maeans. 
+
+Figure 3:
+
+* The comparision of Figures 2 and 4 motivate Figure 3, in order to understand the strength of linear dependence between Hs winter maximums and winter AO means. The pearson correlation coefficient of 0.63 indicates a strong positive relationship between the 2 variables. 
+
+## Storm peaks (pot)
+
+The pot dataset contains values of Hs Maximum for a given storm. It is worth examining how the frequency of storms varied over the years.
+
+```{r,fig.height=9,fig.width=12, echo=FALSE}
+colnames(pot)[1]<- "M.storm"
+for ( i in 1:nrow(pot)){
+if (pot$month[i] == 10|pot$month[i] == 11|pot$month[i] == 12){pot$year[i]<- pot$year[i]+1}
+else pot$year[i] <- pot$year[i]}
+#
+for ( i in 1:nrow(pot)){
+  if (pot$month[i] == 10){pot$month[i]<- "Oct"
+  } else if (pot$month[i] == 11){pot$month[i]<- "Nov"
+  } else if (pot$month[i] == 12){pot$month[i]<- "Dec"
+  } else if (pot$month[i] == 1){pot$month[i]<- "Jan"
+  } else if (pot$month[i] == 2){pot$month[i]<- "Feb"
+  } else if (pot$month[i] == 3){pot$month[i]<- "March"}}
+#
+fmonth<-factor(pot$month, levels=c("Oct", "Nov", "Dec", "Jan", "Feb", "March"))
+#
+par(mfrow=c(2,2))
+plot(table(pot$year), main = "No.of storms per water year (5)", cex.main = 1.5, xlab = "water year", ylab = "No.of storms", cex.lab = 1.25, col = "blue" );box(lwd=2);abline(h= mean(table(pot$year)))
+#
+boxplot(pot$M.storm, main = "Summary of Hs storm maximums (6)", cex.main = 1.5, xlab = "Hs storm maximum / m", cex.lab = 1.25 , horizontal = T, col = "dodgerblue1");box(lwd=2)
+#
+plot(pot$year,pot$M.storm, pch = 16, main = "Hs storm maximums over winters (7)", cex.main = 1.5, ylab = "Hs storm maximum / m", xlab = "water year", cex.lab = 1.25, col= "blue");box(lwd=2);abline(h= mean(pot$M.storm))
+#
+plot(fmonth,pot$M.storm, main = "Hs storm maximums for winter months (8)", cex.main = 1.5, xlab = "month", ylab = "Hs storm maximum / m", cex.lab = 1.25 , col = "dodgerblue1");box(lwd = 2)
+#
+```
+
+Figure 5:
+
+* Figure 5 illustrates the no.of storms observed over a given winter which ends in the year listed on the x-axis.
+* An interesting sight on the graph is that, between the 7 year period of 1988 to 1995, we see the most no.of storms that exceed the sample mean of 10.625 storms per year. More importantly, this 7 year block consists of the highest Hs winter maximums as observed in Figure 1.
+
+Figure 6:
+
+* The long whisker on the RHS represents a right - skewed distribution of Hs storm maxima in the dataset. The plot displays that the 25% of the data within the upper quartile and the maximum, are quite well spread out. 
+
+Figure 8:
+
+* We see that storms maxmiums tend to be higher in the months of December and January.
+
+
+```{r, echo=FALSE}
+load("C:/Users/teja_/OneDrive/41117backup/SHARWIN/Sharwin Academia/Third Year/STAT0017 - STS/Topic_1/pot.Rdata")
+colnames(pot)[1]<- "M.storm"
+```
+
+## Comments
+
+${}$\hspace*{\fill} [10]
+
+# Extreme value (EV) modelling of $H_s$
+
+## GEV modelling of winter maxima
+
+### Maximum Likelihood-Based Inference
+
+```{r, fig.height=5,fig.width=12}
+
+# fit GEV model to Winter Maxima using 'ismev' package
+m1 <- gev.fit(wm$M.winter, show = F)
+#
+# draw a PDF of the fitted GEV distribution and compare it with the 
+# density plot of raw data.
+#
+# generate quantiles and corresponding densities
+M.winter_values <- seq(7.7,16.5,by = 0.001)
+density.values <- dgev(M.winter_values, loc = m1$mle[1], scale = m1$mle[2], shape = m1$mle[3])
+#
+par(mfrow=c(1,2))
+#
+plot( M.winter_values, density.values, main = "pdf of fitted GEV distribution (9)",
+      cex.main = 1.5, xlab = "Hs maximum / m", ylab = "density", cex.lab = 1.25);box(lwd = 2)
+#
+plot(density(wm$M.winter),main = "Density plot of raw data (10)", cex.main = 1.5, 
+     xlab = "Hs maximum / m",ylab = "density", cex.lab = 1.25);box(lwd = 2)
+```
+Figures 9 and 10:
+
+* The fitted GEV distribution's pdf does not display any clear lack of fit. It seems to indicate that the GEV distribution fits the Hs winter maxima in our dataset fairly well.
+
+```{r}
+# upper end point of the fitted GEV distribution
+m1$mle[1]-(m1$mle[2] / m1$mle[3])
+```
+
+The estimate of the shape parameter is negative, therefore, the fitted GEV distribution has an upper end point. The fitted GEV distribution estimates the maximum significant wave height observed over a winter block to be below or equal to 19.13 (2.d.p) metres at an given time period.
+
+```{r, fig.height=9,fig.width=12}
+# Model checking
+par(mfrow=c(2,2))
+#
+pjn.gev.profxi(m1,-0.4,0.2);box(lwd = 2);title(main = 
+"profile log-likelihood over shape parameters (11)", cex.main = 1.5, cex.lab = 1.25)
+#
+# figure 12 
+pjn.gev.rl(m1$mle, m1$cov, m1$data, "return Period")
+#
+# ecdf of Hs Maximum
+plot(ecdf(wm$M.winter), main = "Empirical CDF of Hs winter maximums (13)", 
+cex.main = 1.5, xlab = "Hs winter maximum / m", ylab = "probability", cex.lab = 1.25);
+box(lwd = 2)
+# cdf of Hs Maximum
+probs <- seq(0.0001,1-0.0001,by = 0.00001)
+Hs_Maximums <- qgev(probs, loc = m1$mle[1], scale = m1$mle[2] , shape = m1$mle[3])
+plot( Hs_Maximums, probs, main = "CDF of Hs Winter Maximums (14)", cex.main = 1.5, 
+xlab = "Hs maximum / m", ylab = "p", cex.lab = 1.25)
+```
+
+### Comments
+
+R output and Figure 11:
+
+* The R output provides the MLE point estimate of the shape parameter and the limits of the 95% confidence interval depicted on Figure 11. The output suggests that this particular interval has a 95% chance of containing the true value of the shape parameter.
+
+* The profile log-likelihood graph shows a fairly symmetric confidence interval with only a small degree of positive skewness, reflecting slightly more uncertainty about how large the shape parameter can be.      
+
+Figure 12:
+
+* The plot is showing that the return level curve asymptotes to a finite level as a consequence of the negative MLE estimate of the shape parameter. Until the 10 yr return period,empirical data corresponding to their return period are matched satisfactorily well to the theoretical values from the fitted GEV model.Thereafter there is evidence of discrepancies at the top.
+
+* The large point-wise confidence intervals towards the RHS of the plot reflect higher variability for larger return periods which means there is more uncertainty about the estimates of higher quantiles from the fitted GEV model. 
+
+Figure 13 and 14:
+
+* The theoretical CDF shows the probability of a Hs winter maximum observation to be below 16 to be close to one and seems to be consistent with empirical CDF.
+ 
+### Bayesian Inference
+
+I have choosen uninformative priors to reflect my lack of expertise in metaocean conditions. 
+
+```{r}
+# Bayesian Inference using the 'revdbayes' package 
+
+pn <- set_prior(prior = c("flatflat"), model = "gev" )
+n <- 10000
+gevp <- rpost(n, model = "gev", prior = pn, data = wm$M.winter, nrep = 100)
+plot1 <- pp_check(gevp, type = "overlaid") + ggtitle("GEV empirical CDFs (15)")
+plot1
+summary(gevp$sim_vals)
+```
+
+### Comments
+
+Figure 15:
+
+We learn that the plots above do not suggest clear lack-of-fit by the GEV model. 
+The observed data seem to look like a typical replication from the posterior predictive distribution as the CDFs from the simulated samples are closely packed to the empirical CDF.
+
+We learn from the summary R output that the sample means of the parameters generated from the 100 simulated samples are 11.26, 1.26 and -0.138; the shape parameter's MLE estimate of -0.153 is lower.
+
+## Binomial-GP modelling of storm peaks
+
+### Threshold selection
+
+Graphical procedures for threshold selection:
+
+* Jonathan and Ewans(2013) recommend that when making inferences about a GP distribution, there should be no fewer than 50 exceedances. I took this recommendation into account and therefore set the validation threshold at the 90th percentile, which provides 60 exceedances.
+
+```{r, fig.height=5, fig.width=20}
+u_vec_pot <- quantile(pot$M.storm, probs = seq(from = 0.1, to = 0.90, by = 0.05))
+gpd.fitrange.student(pot$M.storm, umin = u_vec_pot[1], 
+umax = u_vec_pot[length(u_vec_pot)],nint = 70)
+title(main = "Threshold stability plot (16)", cex.main = 1.5);box(lwd = 2)
+abline( h = -0.15)
+```
+
+Figure 16:
+
+* It seems to me that the lowest threshold above which estimates seem to be somehwat constant is near 10 metres. This observation is guided with the line drawn on the y-axis when the shape parameter takes the value of -0.15.
+
+In addition, the plot takes sampling variability into account, suggesting that if the threshold value is selected to be 10.00 metres, there is a 95% chance that the interval around -0.15 will capture the true shape parameter value of the GP distribution that is fitted to exceedances over 10.00 metres.
+
+Cross validation approach for threshold selection:
+
+```{r}
+n <- 10000
+npy <- length(pot$M.storm) / (max(pot$year)-(min(pot$year)+1))
+pot_cv <- ithresh(pot$M.storm, u_vec_pot, n = n , npy = npy)
+plot(pot_cv,cex.axis = 1.2);box(lwd = 2);mtext("North Sea : significant wave height / m  (17)", side = 3, line = 2.5)
+summary(pot_cv)
+```
+Figure 17:
+
+* We see that the graph peaks at the 65% threshold, which corresponds to the highest threshold weight for any given quantile between 0 and 90. We learn that the cross validation approach suggests 9.7992 to be the training threshold which has the best predictive performance at the validation threshold of the 90% quantile.
+
+Given the parameter stability plot suggests choosing a threshold close to 10 and taking into account the the result of the cross validation, I have decided to choose my threshold to be 9.7992
+
+### Maximum Likelihood-Based Inference
+
+```{r}
+u <- summary(pot_cv)[3]
+m2 <- gpd.fit(pot$M.storm,u,npy = npy, show = F)
+```
+
+
+```{r, echo=FALSE}
+cat("The MLE estimates of the scale and shape parameters are :")
+m2$mle
+cat("The MLE standard errors of the scale and shape parameters are :")
+m2$se
+# estimate of the probability of exceeding the threshold u
+pu <- m2$rate
+cat("The no.of peaks over the threshold of 9.7992 metres is :", length(m2$data)) 
+```
+
+
+
+```{r, fig.height=9,fig.width=12 }
+#Model checking
+#
+par(mfrow=c(2,2))
+#
+pjn.gpd.profxi.student(m2, xlow = -0.35, xup = 0.1, conf = 0.95);box(lwd = 2)
+title( main = "profile log-likelihood over shape parameters (18)", cex.main = 1.5, cex.lab = 1.25)
+#
+# figure 19
+pjn.gpd.rl(m2$mle, m2$threshold, pu, m2$n, npy, m2$cov,m2$data, m2$xdata)
+#
+# ecdf of Hs Maximum
+plot(ecdf(m2$data), main = "Empirical CDF of Hs peaks over threshold (20)", 
+cex.main = 1.5, xlab = "Hs maximum / m", ylab = "p", cex.lab = 1.25);box(lwd = 2)
+#
+# cdf of Hs Maximum
+probs <- seq(0.0001,1-0.0001,by = 0.00001)
+Storm_Maximums <- qgp(probs, loc = u, scale = m2$mle[1], shape = m2$mle[2])
+plot( Storm_Maximums, probs, main = "CDF of Hs peaks over threshold (21)", cex.main = 1.5, 
+xlab = "Hs maximum / m", ylab = "p", cex.lab = 1.25)
+```
+  
+### Comments
+
+R output and Figure 18:
+
+* The R output provides the MLE point estimate of the shape parameter and the limits of the 95% confidence interval depicted on Figure 21. The output suggests that this particular interval has a 95% chance of containing the true value of the shape parameter for the BGP distribution modelling this data.
+
+* The profile log-likelihood graph shows a fairly symmetric confidence interval with only a small  degree of positive skewness, reflecting slightly more uncertainty about how large the value of shape parameter can be.     
+
+Figure 19:
+
+* The empirical data corresponding to it's return period is matched fairly well to the theoretical values  from the fitted BGP model that are represented by the line. Until the 10 year return period, the observations are close to the curve and thereafter there is evidence of discrepeances at the top.
+
+* The large point-wise confidence intervals reflect higher variability for larger return periods which correspond to higher quantiles of the fitted BGP model. 
+
+Figure 20 and 21:
+
+* The theoretical CDF shows the probability of a Hs winter maximum observation to take a value below 16, to be very close to one and seems to match the empirical CDF fairly well.
+
+### Bayesian Inference
+
+```{r}
+fp <- set_prior(prior = "flat", model = "gp", min_xi = -1)
+bp <- set_bin_prior(prior = "laplace")
+#
+bgpg <- rpost(n = 10000, model = "bingp", prior = fp, thresh = u, data = pot$M.storm, bin_prior = bp, npy = npy, nrep = 50)
+#
+plot1 <- pp_check(bgpg, type = "overlaid") + ggtitle("GPD empirical CDFs (22)")
+plot1
+#summary(bgpg)
+```
+
+### Comments
+
+Figure 22:
+
+The observed data seem to look like a typical replication from the posterior predictive distribution as the CDFs from the simulated samples are closely packed to the empirical CDF.
+
+${}$\hspace*{\fill} [25]
+
+## Reporting to your client
+
+```{r}
+#A:
+A <- predict(pot_cv, n_years = c(100), type = "i")$long
+cat("An interval estimate of Hs100 with a coverage probability of 95% is:")
+A
+#
+#B:
+B <- predict(pot_cv, n_years = c(100), type = "q", x = 0.99, lower_tail= TRUE)$y
+cat("An estimate of the value that is exceeded by Hs100 with a probability 1% is:")
+B
+#
+#C:
+C<- plot(predict(pot_cv, n_years = c(100), type = "p", which_u = "all"), main = "GP empirical CDFs")
+```
+
+Why GP instead of GEV?
+
+* The GP model better utilises all the information given to me.The GEV model uses the Hs maximums observed over the winter and derives it's construction from the asymptotic argument that the no.of observations in each winter block is large enough.However, in any particular winter block, additional extreme events may have occurred that are possibly more extreme than the maximum in other winter blocks. Because such data are not the winter maxima in the wateryear they arose, they are excluded from the analysis. Hence I prefer the idea of focusing on approximations for high thresholds, rather than of long block length.
+
+Why Bayesian instead of MLE?
+
+* MLE estimates are "best guesses" of the true paramters given the available historical information. Given another string of releasiations of data, this new set of data are equally representative of the true process being studied, and are likely to lead to a different set of estimates of the parameters. Considering extreme value modelling, small changes in the parameters can have great influences on extraplations of data.Therefore, I found it important to use an appraoch that constructs distributions for the parameters of the models themselves.
+
+* Another point to note is the opportunity available for the company to consult with metacoean experts and construct an informative prior, which develop the model to better suit the context and envrironment it's dealing with.
+
+Why not produce a CDF using the "best" threshold of 9.7992 ?
+
+As mentioned in Northrop et al(2017), there is empirical and theoretical evidence (Hoeting et al.(1999)) that averaging inferences using many thresholds results in better average predictive ability than provided by a single model which employs the "best" threshold. 
+
+${}$\hspace*{\fill} [15]
+
+# EV regression modelling of winter maximum $H_s$ on NAO
+
+## Build a GEV regression model
+
+```{r}
+scaled.wateryear <- (wm[,2]-min(wm$waterYear))/(max(wm$waterYear)-min(wm$waterYear))
+ydat <- as.matrix(cbind(scaled.wateryear, wm[,3:6])) 
+fit4 <- gev.fit(wm[,1], ydat = ydat, mul = 4, show = FALSE)
+cat("\nThe p-value from likelihood ratio test is :\n")
+pchisq(2*(m1$nllh-fit4$nllh),1,lower.tail=F)
+cat("\nThe estimates of the coefficients for the 'meanAO' dependent GEV model are:\n")
+fit4$mle
+gev.diag(fit4)
+```
+Both the residual probability plot and the residual quantile plot don't seem to suggest any clear lack of fit.
+
+
+To select my regression model, I first referred to Figure 1 to assess any clear sign of time trends in Hs winter maximums. Thereafter I examined the correlation between each covariate in the wm dataset with Hs winter maximums. Based on these observations, I learnt that there didn't seem to be any clear signs of the level of Hs winter maximums changing over time and that A0mean has the highest linear dependence with respect to Hs winter maximums when compared to the remaining covariates.
+
+My next step was to build 5 simple linear regression models, corresponding to each covariate and use the likelihood ratio tests to determine the covariate producing the lowest p-value. A low p-value provides significant evidence to reject the null hypothesis that the original GEV model fitted in section 3.1 is a better fit of the data than the model being suggested.
+
+Thereafter I went on to test cross combinations and also model the scale parameter in terms of the covariates.
+The conclusion of my regression  model findings are that the GEV model with parameters ( mu(t), sigma, scale) where mu(t) = mu0 + mu1MeanA0(t) is the most parsimonious and well fitting model of the several combinations I tested.
+
+${}$\hspace*{\fill} [15]
+
+## Inference for $H_s^{100}$
+
+Please find the scanned page
+
+${}$\hspace*{\fill} [10]
+
+<script type="text/x-mathjax-config">
+   MathJax.Hub.Config({  "HTML-CSS": { minScaleAdjust: 125, availableFonts: [] }  });
+</script>

@@ -1,0 +1,502 @@
+---
+title: "VaR_CopulaAnalysis_Report"
+author: "Teja Sharwin Vaddavalli"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_width: 6
+    fig_height: 4
+---
+
+```{r, include = FALSE}
+
+load("ICA2_data.RData")
+library("fUnitRoots", lib.loc="~/R/win-library/3.5")
+library("CDVine", lib.loc="~/R/win-library/3.5")
+library("fGarch", lib.loc="~/R/win-library/3.5")
+library("goftest", lib.loc="~/R/win-library/3.5")
+library("KScorrect", lib.loc="~/R/win-library/3.5")
+library("stats", lib.loc="C:/Program Files/R/R-3.5.2/library")
+library("nloptr", lib.loc="~/R/win-library/3.5")
+library("RColorBrewer", lib.loc="~/R/win-library/3.5")
+
+set.seed(123)
+
+```
+
+\pagebreak
+
+# Part (a)
+
+## Data Processing - Obtaining Uniform RVs
+
+We first plot the 6 stock indices to examine their behaviour over time.
+
+```{r, fig.width= 10, fig.height=10, echo=FALSE}
+par(mfrow=c(3,2))
+{plot(data$sp500~as.Date(data$date,"%d/%m/%y"),
+      type="l",
+      xaxt='n',
+      yaxt='n',
+      xlab="",
+      ylab="Price",
+      col="blue",
+      main="S&P500 (prices)",
+      xaxs="i", 
+      yaxs="i",
+      ylim=c(600,3000),
+      cex.main=1.1,
+      cex.lab=1)
+  axis(2, at = seq(600,3000,500), tick=TRUE,cex.axis=0.9)
+  axis.Date(1, cex.axis=0.9,at=seq(as.Date("1999/02/25"), as.Date("2019/02/28"), "4 years"));box(lwd=2)}
+#
+{plot(data$dax30~as.Date(data$date,"%d/%m/%y"),type="l",xaxt='n',yaxt='n',
+      xlab="",ylab="Price",col="blue",main="DAX30 (prices)",xaxs="i", 
+      yaxs="i",ylim=c(2000,14000),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(2000,14000,3000), tick=TRUE,cex.axis=0.9)
+  axis.Date(1, cex.axis=0.9,at=seq(as.Date("1999/02/25"), as.Date("2019/02/28"), "4 years"));box(lwd=2)}
+#
+{plot(data$cac40~as.Date(data$date,"%d/%m/%y"),type="l",xaxt='n',yaxt='n',
+      xlab="",ylab="Price",col="blue",main="CAC40 (prices)",xaxs="i", 
+      yaxs="i",ylim=c(2000,7000),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(200,7000,500), tick=TRUE,cex.axis=0.9)
+  axis.Date(1, cex.axis=0.9,at=seq(as.Date("1999/02/25"), as.Date("2019/02/28"), "4 years"));box(lwd=2)}
+#
+{plot(data$ftse100~as.Date(data$date,"%d/%m/%y"),type="l",xaxt='n',yaxt='n',
+     xlab="",ylab="Price",col="blue",main="FTSE100 (prices)",xaxs="i", 
+     yaxs="i",ylim=c(3000,8000),cex.main=1.1,cex.lab=1)
+axis(2, at = seq(3000,8000,1000), tick=TRUE,cex.axis=0.9)
+axis.Date(1, cex.axis=0.9,at=seq(as.Date("1999/02/25"), as.Date("2019/02/28"), "4 years"));box(lwd=2)}
+#
+{plot(data$sse~as.Date(data$date,"%d/%m/%y"),type="l",xaxt='n',yaxt='n',
+      xlab="",ylab="Price",col="blue",main="SSE (prices)",xaxs="i", 
+      yaxs="i",ylim=c(1000,6500),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(1000,6500,500), tick=TRUE,cex.axis=0.9)
+  axis.Date(1, cex.axis=0.9,at=seq(as.Date("1999/02/25"), as.Date("2019/02/28"), "4 years"));box(lwd=2)}
+#
+{plot(data$nikkei225~as.Date(data$date,"%d/%m/%y"),type="l",xaxt='n',yaxt='n',
+      xlab="",ylab="Price",col="blue",main="Nikkei225 (prices)",xaxs="i", 
+      yaxs="i",ylim=c(7000,25000),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(7000,25000,3000), tick=TRUE,cex.axis=0.9)
+  axis.Date(1, cex.axis=0.9,at=seq(as.Date("1999/02/25"), as.Date("2019/02/28"), "4 years"));box(lwd=2)}
+```
+
+We choose to model SP500, DAX30 and CAC40.We see clear dependence between the three stock indicies from visual inspection, the Pearson correlation beteween the indicies supports this:
+ 
+```{r, echo=FALSE}
+  cor(data[,c(3,5,7)])  # Pearson's correlation between SP500, DAX30 and CAC40
+```
+
+
+It is clear that the prices for all 3 indicies violate mean and covariance stationarity. Hence, we attempt to tranform the stock indicies data such that it is weakly stationary, for which appropriate models can be fitted.
+
+
+We can do this by taking the log-returns of each of the prices. We use log-returns because they have convenient properties such as allowing for time-additivity and ease of computation.
+We calculate the log-returns, $r_t$ as follows:
+
+$$ r_t = \log(P_t) - \log(P_{t-1})$$
+
+where $r_t$ and $P_t$ denote the log-returns and price of the index at time t. The log return plots are shown below.
+
+Construct log-returns:
+```{r}
+LogRet1<-diff(log(data$sp500), lag=1,na=remove)   # Taking first differences and removing 
+LogRet2<-diff(log(data$dax30), lag=1,na=remove)   # the NA point generated
+LogRet3<- diff(log(data$cac40), lag=1,na=remove)
+```
+
+
+```{r, fig.width=8, fig.height=7.5, echo=FALSE}
+par(mfrow=c(3,1))
+
+{plot(LogRet1~as.Date(data$date[2:length(data$date)],"%d/%m/%y"),type="l",yaxt='n',xaxt='n',
+      xlab="",ylab="Log-Returns",main="SP500",xaxs="i", 
+      yaxs="i", col="blue",ylim=c(-0.22,0.2),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(-0.15,0.15,0.1), tick=TRUE,cex.axis=0.7)
+  axis.Date(1, cex.axis=0.7, at=seq(as.Date("1998/01/04"), as.Date("2019/02/28"), "3 years"))
+  abline(h=0,lwd = 2);box(lwd = 2)}
+
+{plot(LogRet2~as.Date(data$date[2:length(data$date)],"%d/%m/%y"),type="l",yaxt='n',xaxt='n',
+      xlab="",ylab="Log-Returns",main="DAX30",xaxs="i", 
+      yaxs="i", col="blue",ylim=c(-0.22,0.2),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(-0.15,0.15,0.1), tick=TRUE,cex.axis=0.7)
+  axis.Date(1, cex.axis=0.7, at=seq(as.Date("1998/01/04"), as.Date("2019/02/28"), "3 years"))
+  abline(h=0,lwd = 2);box(lwd = 2)}
+
+{plot(LogRet3~as.Date(data$date[2:length(data$date)],"%d/%m/%y"),type="l",yaxt='n',xaxt='n',
+      xlab="",ylab="Log-Returns",main="CAC40",xaxs="i", 
+      yaxs="i", col="blue",ylim=c(-0.22,0.2),cex.main=1.1,cex.lab=1)
+  axis(2, at = seq(-0.15,0.15,0.1), tick=TRUE,cex.axis=0.7)
+  axis.Date(1, cex.axis=0.7, at=seq(as.Date("1998/01/04"), as.Date("2019/02/28"), "3 years"))
+  abline(h=0, lwd = 2);box(lwd = 2)}
+```
+
+log-returns seem to look mean stationary, however, the conditional variance seems to change over time. 
+To back the visual inspection with statistical evidence, we conduct a unit root test for log-returns of each index.
+
+```{r}
+cat("Result from unitroot test on log-returns of SP500:\n")
+unitrootTest(LogRet1)@test$p.value[1]
+cat("Result from unitroot test on log-returns of DAX30:\n")
+unitrootTest(LogRet2)@test$p.value[1]
+cat("Result from unitroot test on log-returns of CAC40:\n")
+unitrootTest(LogRet3)@test$p.value[1]
+```
+
+All p-values are extremely small which suggest that the log-returns do not have a unit root, hence are reasonably stationary.
+
+Below, we plot the ACFs to inspect which lags are signficant. This information is relevant because it guides us in choosing a suitable stationary model to fit the data on log-returns.  
+
+
+```{r, fig.height=5.5, fig.width=7.5}
+par(mfrow=c(3,2))
+
+acf(LogRet1);box(lwd=2)         # Plot the autoccorelation functions for log-Returns
+acf(LogRet1^2);box(lwd=2)       # and log-Returns squared
+
+acf(LogRet2);box(lwd=2)
+acf(LogRet2^2);box(lwd=2)
+
+acf(LogRet3);box(lwd=2)
+acf(LogRet3^2);box(lwd=2)
+```
+
+The ACFs of the log-returns suggest there are some significant lags for each of the indicies, hinting for an AR term to be incorporated.
+The ACFs of the (log-returns)^2 which are a proxy for variance of log-returns, suggests the conditionary variance of log-returns does seem to change over time. Certain periods seem to display volatility clustering and this is more clearly visible in the plots below.
+
+Note: the x-axis for the plots below denotes the time in weeks.
+
+
+```{r, fig.height=6.5,echo=FALSE}
+par(mfrow=c(3,1))
+ts.plot((LogRet1-mean(LogRet1))^2, ylab = "(log-returns - mean)^2");box(lwd=2)
+ts.plot((LogRet2-mean(LogRet2))^2, ylab = "(log-returns - mean)^2");box(lwd=2)
+ts.plot((LogRet3-mean(LogRet3))^2, ylab = "(log-returns - mean)^2");box(lwd=2)
+```
+
+In order to model the moving average and conditional heteroskedasticity exhibited by the log-returns, we employ an ARMA-GARCH model. We model the residuals using a skewed student-t distribution as empirical data and general consensus suggests for this probability distribution to model financial data more appropriatly than other distributions, in particular,    the normal distribution.
+
+
+We now try different models for each index:
+```{r}
+
+#SP500
+
+model1.1 <- garchFit(formula=~arma(1,0)+garch(1,1),data=LogRet1,trace=F,cond.dist="sstd")
+model1.2 <- garchFit(formula=~arma(1,0)+garch(1,2),data=LogRet1,trace=F,cond.dist="sstd")
+model1.3 <- garchFit(formula=~arma(1,0)+garch(2,1),data=LogRet1,trace=F,cond.dist="sstd")
+model1.4 <- garchFit(formula=~arma(1,0)+garch(2,2),data=LogRet1,trace=F,cond.dist="sstd")
+model1.5 <- garchFit(formula=~arma(7,0)+garch(1,1),data=LogRet1,trace=F,cond.dist="sstd")   
+# tested model1.5 against model1.1
+```
+While the ACF suggested a couple of lags at a later period in time to be significant, the AIC scores and ANOVA tests suggested an ARMA(1,0) sufficed. Based on AIC scores and ANOVA tests, we concluded that ARMA(1,0)-GARCH(1,1) was the most appropriate fit, extra terms were not beneficial. 
+
+```{r}
+
+#DAX30
+
+model2.1 <- garchFit(formula=~garch(1,1),data=LogRet2,trace=F,cond.dist="sstd")
+model2.2 <- garchFit(formula=~garch(1,2),data=LogRet2,trace=F,cond.dist="sstd")
+model2.3 <- garchFit(formula=~garch(2,1),data=LogRet2,trace=F,cond.dist="sstd")
+model2.5 <- garchFit(formula=~arma(1,1)+garch(1,2),data=LogRet2,trace=F,cond.dist="sstd")
+```
+The ACF suggested an ARMA compenent was not necessary and testing an ARMA(1,1) term demonstrated no signficant effect. Similar to the SP500, based on AIC scores and ANOVA tests, we concluded that GARCH(1,2) was the most appropriate fit, extra terms were not beneficial. 
+
+```{r}
+
+#CAX40
+
+model3.1 <- garchFit(formula=~arma(1,0)+garch(1,1),data=LogRet3,trace=F,cond.dist="sstd")
+model3.2 <- garchFit(formula=~arma(1,0)+garch(1,2),data=LogRet3,trace=F,cond.dist="sstd")
+model3.3 <- garchFit(formula=~arma(1,0)+garch(2,1),data=LogRet3,trace=F,cond.dist="sstd")
+```
+Using similar procedures as above to compare models, we concluded that ARMA(1,0)-GARCH(1,1) was the most appropriate fit.
+
+
+After choosing and fitting our models for each index, we proceed by plotting the ACF of the residuals to inspect whether our models have sucessfully captured the effects of the past lags.
+
+```{r}
+
+res1 <- residuals(model1.1, standardize=TRUE)
+res2 <- residuals(model2.2, standardize=TRUE)
+res3 <- residuals(model3.1, standardize=TRUE)
+```
+
+```{r,fig.height=5.5, fig.width=7.5}
+par(mfrow=c(3,2))
+
+acf(res1);box(lwd=2)
+acf(res1^2);box(lwd=2)
+acf(res2);box(lwd=2)
+acf(res2^2);box(lwd=2)
+acf(res3);box(lwd=2)
+acf(res3^2);box(lwd=2)
+```
+
+
+From the ACFs we see now that none of the lags appear significant, giving us confidence in our models.
+To double check, we use a Ljung Box test for whether the first 10 lags are autocorrelated, we observe that all p-values which there is insufficient evidence to suggest the existence of auto-correlation. The p-values are given below: 
+
+
+```{r}
+Box.test(res1, lag = 10, type = c("Ljung-Box"), fitdf = 0)
+Box.test(res1^2, lag = 10, type = c("Ljung-Box"), fitdf = 0)
+Box.test(res2, lag = 10, type = c("Ljung-Box"), fitdf = 0)
+Box.test(res2^2, lag = 10, type = c("Ljung-Box"), fitdf = 0)
+Box.test(res3, lag = 10, type = c("Ljung-Box"), fitdf = 0)
+Box.test(res3^2, lag = 10, type = c("Ljung-Box"), fitdf = 0)
+```
+
+We compare the empirical distribution of the residuals from our model 1 to that of the fitted skewed student t so as to verify it is an appropriate fit.
+
+```{r, echo=FALSE, fig.width=10, fig.height=5, echo=FALSE}
+
+colours <- RColorBrewer::brewer.pal(3, "Set1")
+skew1 <- coef(model1.1)[6]
+shape1 <- coef(model1.1)[7]
+plot(density(res1),main = "Densities of SP500 residuals",lwd = 2)
+xfit <- seq(-7,3,length=100) 
+yfit <- dsstd(xfit, mean=0, sd=1, nu=shape1, xi=skew1)
+lines(xfit, yfit, col=colours[1], lwd=2)
+legend("topleft", legend=c("res1","sstd"),
+       col=c("black",colours[1]), lwd = c(2,2), cex=1.2)
+box(lwd = 2)
+```
+
+
+Now that we've fitted an appropriate model we will take the residuals and transform them into 'uniform' random variables by using the distribution function of the skewed student t. We will then check that they are reasonably uniform by the Anderson-Darling test, in each case the p values are large enough so as to not reject the null hypothesis that they are indeed drawn from a uniform distribution. We also plot the histograms to assess the distribution visually.    
+
+
+
+```{r}
+
+skew1 <- coef(model1.1)[6]
+shape1 <- coef(model1.1)[7]
+u1<-psstd(res1, mean=0, sd=1, nu=shape1, xi=skew1)
+
+ADtest1<-ad.test(u1, null="punif")
+ADtest1$p.value
+
+skew2 <- coef(model2.2)[6]
+shape2 <- coef(model2.2)[7]
+u2<-psstd(res2, mean=0, sd=1, nu=shape2, xi=skew2)
+
+ADtest2<-ad.test(u2, null="punif")
+ADtest2$p.value
+
+skew3 <- coef(model3.1)[6]
+shape3 <- coef(model3.1)[7]
+u3<-psstd(res3, mean=0, sd=1, nu=shape3, xi=skew3)
+
+ADtest3<-ad.test(u3, null="punif")
+ADtest3$p.value
+```
+
+```{r, echo=FALSE,, fig.width=10, fig.height=4}
+par(mfrow=c(1,1))
+hist(u1)
+```
+
+```{r, echo=FALSE, fig.width=10, fig.height=8}
+par(mfrow=c(2,1))
+hist(u2);hist(u3)
+```
+
+
+## Fit Copula and estimate Value-at-Risk 
+
+Given the obtained uniform residuals, we would like to fit a copula to them so as to capture the dependence between the indicies.
+
+In order to decide the structure of the vine we consider the correlations between the transformed residuals:
+```{r}
+
+u <- cbind(u1,u2,u3)
+cor(u)
+
+```
+
+Based on which variables have the strongest correlation, we choose to explicitly model the dependance between u1 and u3 as well as between u2 and u3. Since we only have 3 variables to model there is no difference between C and D vines and so this completely defines the vine structure.
+
+Using the CDVine package we then select the most appropriate copulas in each case based on AIC scores with parameters estimated via maximum likelihood:
+
+```{r}
+u.1 <- cbind(u1,u3,u2)
+vinemodel1.1 <- CDVineCopSelect(u.1,type=2,familyset=c(1:10,13,14,23,24))
+vinemodel1.1
+
+```
+
+Now we have fitted our vine copula we aim to compute the VaR by Monte Carlo simulation. To do this we simulate 1000 realisations from the copula. Assuming the marginal distributions of the log-returns to be normal we then transform the unifrom random variables into standard normal random variables. Given the log-returns of the three indicies we then calculate the log-returns of the portfolio assuming equal weight assinged to each of the three stock indicies.
+
+
+
+```{r}
+
+N=1000
+# Simulate from copula
+u_sim <- CDVineSim(N, family=vinemodel1.1$family, vinemodel1.1$par,  
+                   vinemodel1.1$par2, type=2)
+# Transform to normal RVs
+n_sim <- qnorm(u_sim)
+
+x1<-n_sim[,1]
+x2<-n_sim[,2]
+x3<-n_sim[,3]
+
+# Calculate whole portfolio returns
+retport <- log( 1 + ( ( (exp(x1)-1) /3 )+ ( (exp(x2)-1)/3 ) + ( (exp(x3)-1)/3 ) ) )
+
+plot(density(retport),
+     lwd = 2,
+     main = "Log-Returns of Portfolio",
+     las = 1, 
+     col = colours[2])
+box(lwd = 2)
+
+
+```
+
+
+Now that we have a number of simulated log-returns for the portfolio, we proceed by estimating the VaR by taking the empirical quantiles of the samples:
+
+```{r}
+quantile(retport,c(0.01,0.05))
+```
+
+Log-returns are not the most clear when considering how much of the portfolio we can lose so we transform the log-returns back to regular returns:
+
+```{r}
+
+ar <- quantile(retport,c(0.01,0.05))    
+exp(ar)-1                             # transform back for realistic interpretation
+
+```
+
+These are clearer to interpret as the percentage of the portfolio that is at risk at the 1% and 5% significance levels.
+
+To conclude, based on our assumption of normality and using Monte Carlo simulation, we calculate the VaR at the 99% level to be 88.4% of the portfolio and at the 95% level to be at 75.6% of the portfolio.
+
+${}$\hspace*{\fill} [10]
+
+# Part (b)
+
+We would now like to validate our chosen copula by simulation. To do this we simulate 1000 realisations from the previouly choosen Copula before comparing the correlation in the simulated random variables with the correlation in our data as well as fitting a copula to our simulated random variables to check that we get the same copula as for our data.
+
+```{r}
+N=1000
+u_sim1.1 <- CDVineSim(N, family=vinemodel1.1$family, vinemodel1.1$par,  vinemodel1.1$par2, type=2)
+cor(u_sim1.1,method = c("kendall"))
+cor(u.1,method = c("kendall"))
+
+vinemodel_sim1.1 <- CDVineCopSelect(u_sim,type=2,familyset=c(1:10,13,14,23,24))
+vinemodel_sim1.1
+vinemodel1.1
+
+```
+
+We see from the correlations from the simulated data that they are very close to that of the real data, which is what we want. Of particular interest is the correlation between u1 and u2 (which was not explicitly modelled in the vine) and we see that there is only a difference of 0.005 which is very low and comparable to the correletions of the variables that were explicitely modelled.
+
+When we fit a copula to the simulated data we see it fits the exact same family for each pair of variables with very similar parameters, which is what we would hope to see.
+
+In conclusion then, this validates our chosen copula model or at least gives us little reason as to doubt it.
+
+
+# Part (c)
+
+We first define a function that takes a value of $\rho$ and outputs the negative log-likelihood of the data under the bivariate normal copula.
+
+```{r}
+bivariate_normal_loglikelihood <- function(p){
+  
+  n=length(u[,1])
+  
+  vec <- BiCopPDF(u[,1],u[,2],family=1,par=p)
+  
+  sumlik=-sum(log(vec[1:n]));
+  
+  return(sumlik)
+}
+```
+
+Now that we have our function we use a standard optimiser to search for the value of $\rho$ that minimises the negative log-likelihood:
+
+```{r}
+opts <- list("algorithm" = "NLOPT_LN_COBYLA", "xtol_rel"  = 1.0e-7, "maxeval"   = 1000 )
+nloptr(x0=0, eval_f=bivariate_normal_loglikelihood, lb=c(-0.99), ub=c(0.99), opts=opts)
+
+```
+
+This finds an optimal value of $\rho = 0.7280217$.
+
+```{r}
+BiCopEst(u[,1],u[,2],family=1)
+```
+
+If we use the standard function from CDVine we get a value of the parameter of 0.728. This is exactly the same as the value we found giving us confidence in our method.
+
+# Part (d)
+
+\textbf{Definition of VaR:}  Let the value-at-risk (VaR) of a portfolio at time $t$, with a confidence level $(1-\alpha)$ over time horizon $H$ be: 
+
+$VaR_t(\alpha) = inf\{s : F_t(s) \geq \alpha\}$,
+
+where $\alpha \in (0,1)$ and $F_t$ is the cumulative distribution function of the portfolio return at time $t$. This means that we are $100(1 - \alpha)\%$ confident that the loss in the period $H$ will not be larger than VaR. Probabilistically VaR is a quantile of the loss distribution. 
+ 
+In other words, given a value $\alpha$ element of $(0,1)$, the value at risk is a value such that there is a $100\alpha\%$ probability that we will lose more than this in the specified time horizon. 
+
+VaR is the standard measure used to quantify the risk that an asset or portfolio is facing. Other notable measures of risk are the standard deviation and the expected shortfall. 
+
+\textbf{Issues with VaR:} Although VaR is a simple measure, estimating it in multivariate cases can become complicated. Classically three methods have been used to calculate it: historical simulations, variance-covariance, and the Monte Carlo method [1]. The most common approach being variance-covariance, due to the Riskmetrics [2] report including it as the preferred method. For this, the assumption of the joint distribution of asset returns being a multivariate normal has to be adopted. However, the normal distribution is often inadequate in finance. [3] and [4] found asset returns to be more highly correlated during volatile markets and when the market is down; using non-symmetric distributions which reflect the difference in the tails of the distribution is more accurate. Inefficient VaR estimates can lead to portfolios being riskier than intended or to too conservative estimates. 
+
+\textbf{Using copulas:} Copulas model the dependency structure between a large number of marginal distributions. To specify a copula we need the marginal distributions of the data alongside with the dependence structure linking these [5].
+Most often when copulas are being applied to financial data, they are assumed to be constant over time. Given that correlation between assets is time-varying, as has been documented by [6], copulas should reflect this. Notable models proposed including time-variability for more precise estimates are the dynamic conditional correlation generalized autoregressive conditional heteroscedasticity model (DCC GARCH) put forward by [6] and the Regime Switching Copulas (RSC) by [7]. 
+
+In [6] time-variation was captured by allowing the parameters of the copulae to change with time, according to an evolution equation akin to the GARCH model. This was the first instance of a time-varying copulae. 
+
+[7] was the first to introduce RSCs, this allows the process to be characterised by a number of different copulas each for a given time period; the degree and type of the dependence structure can change over time. Hence, during tranquil trading times the Gaussian copulas are apt, while during crisis copulas with better estimates for the dependence in the lower tails can be used [9].
+
+\textbf{Copulas for VaR estimates:} [1] and [5] reviewed the use of copulas for estimating VaR under different marginals and dependency structures, comparing the results with the classical methods. [1] used three methods of model evaluation: quadratic difference between the left tail of the estimated and empirical copulae, the goodness of fit with the Akaike Information Criterion and the number of VaR violations using backtesting. Both studies found the copulae outperforming classical methods of VaR estimates with backtesting. While [5] found the t-copula with a GARCH-n marginal to provide the best results, [1] found Symmetrized-Joe Clayton (SJC) copula with a GARCH-e marginal the most efficient for their dataset. [8] found the GARCH-t distribution to best model the marginals, and for the dependency structure adopted the SJC copula.  
+
+\textbf{Misspecified copula models:} [10] found the marginal distributions to have much larger effects in estimating the VaR (hence, using correct parameters for the GARCH is  considerably important), compared to using an incorrect copula. Previous literature found misspecification of the copula to only account for less than 20\% of the error introduced to VaR estimates [11], while large parts of the remaining variance were due to misspecification of the marginals. Widespread use of the Gaussian copula, instead of better the tail models, was partially responsible for the 2007 crisis [12]. 
+
+\bigbreak
+
+References used: 
+
+[1] Palaro, H. P., & Hotta, L. K. (2006). Using conditional copula to estimate value at risk. Journal of Data Science, 4, 93-115.
+
+[2] Morgan, J. P. (1994). RiskMetrics Technical Document, Morgan Guaranty Trust Company.
+
+[3] Longin, F., & Solnik, B. (2001). Extreme correlation of international equity markets. The journal of finance, 56(2), 649-676.
+
+[4] Ang, A., & Chen, J. (2002). Asymmetric correlations of equity portfolios. Journal of financial Economics, 63(3), 443-494.
+
+[5] Huang, J. J., Lee, K. J., Liang, H., & Lin, W. F. (2009). Estimating value at risk of portfolio by conditional copula-GARCH method. Insurance: Mathematics and economics, 45(3), 315-324.
+
+[6] Engle, R. (2002). Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models. Journal of Business & Economic Statistics, 20(3), 339-350.
+
+[7] Pelletier, D. (2006). Regime switching for dynamic correlations. Journal of econometrics, 131(1-2), 445-473.
+
+[8] Patton, A. J. (2006). Modelling asymmetric exchange rate dependence. International economic review, 47(2), 527-556.
+
+[9] Manner, H., & Reznikova, O. (2012). A survey on time-varying copulas: specification, simulations, and application. Econometric reviews, 31(6), 654-687.
+
+[10] Fantazzini, D. (2009). The effects of misspecified marginals and copulas on computing the value at risk: A Monte Carlo study. Computational Statistics & Data Analysis, 53(6), 2168-2188.
+
+[11] Ane, T., & Kharoubi, C. (2003). Dependence structure and risk measure. The journal of business, 76(3), 411-438.
+
+[12] https://www.wired.com/2009/02/wp-quant/
+
+
+
+
+
+
+
+
+<script type="text/x-mathjax-config">
+   MathJax.Hub.Config({  "HTML-CSS": { minScaleAdjust: 125, availableFonts: [] }  });
+</script>
