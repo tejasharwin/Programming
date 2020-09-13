@@ -1,6 +1,6 @@
 ---
-title: "STAT0017 ICA 1 2018-19"
-author: "Student number: 16040526"
+title: "STAT0017 Project A 2018-19"
+author: "Student : Teja Sharwin Vaddavalli"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::pdf_document:
@@ -27,10 +27,7 @@ source('C:/Users/teja_/OneDrive/41117backup/SHARWIN/Sharwin Academia/Third Year/
 # You will also need to load any R libraries that you want to use.
 # Some parts of the analyses are based on simulation.
 # We set a set a random number seed so that
-# 1. The numeric results on which you comments will not change each time you run
-#    your code (unless you change the order of the analyses)
-# 2. Your work is easier for me to mark.
-#### PLEASE DO NOT CHANGE THE FOLLOWING LINE OF CODE (KEEP THE SEED as 17) ####
+# The numeric results on with comments will not change each time the code is run (unless you change the order of the analyses)
 set.seed(17)
 ```
 
