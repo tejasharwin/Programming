@@ -7,7 +7,7 @@
 ######  This script is used to conduct statistical analysis on the Haemoglobin 
 ######  levels (Hb levels) of women in Afghanistan. The aim of the analysis is 
 ######  to understand the variation in Hb levels and thereafter 
-######  construct a tatistical model to predict Hb levels among a subset of
+######  construct a statistical model to predict Hb levels among a subset of
 ######  Afghan women.
 ######  
 ######  
