@@ -1,6 +1,6 @@
 ---
-title: "Storm Data Analysis"
-author: "Teja Sharwin Vaddavalli"
+title: "STAT0017 ICA 1 2018-19"
+author: "Student number: 16040526"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::pdf_document:
@@ -14,8 +14,8 @@ output:
 ```{r, include = FALSE}
 # Load the data (you will need to edit this to point to the correct directory
 # on your computer)
-load(file = "C:/wm.Rdata")
-load(file = "C:/pot.Rdata")
+load(file = "C:/Users/teja_/OneDrive/41117backup/SHARWIN/Sharwin Academia/Third Year/STAT0017 - STS/Topic_1/wm.Rdata")
+load(file = "C:/Users/teja_/OneDrive/41117backup/SHARWIN/Sharwin Academia/Third Year/STAT0017 - STS/Topic_1/pot.Rdata")
 library("evd", lib.loc="~/R/win-library/3.5")
 library("ismev",lib.loc="~/R/win-library/3.5")
 library("revdbayes",lib.loc="~/R/win-library/3.5")
@@ -23,16 +23,33 @@ library("threshr",lib.loc="~/R/win-library/3.5")
 library("mev",lib.loc="~/R/win-library/3.5")
 library("ggplot2", lib.loc="~/R/win-library/3.5")
 library("gridExtra", lib.loc="~/R/win-library/3.5")
-source('C:/pjnfunctions.R')
+source('C:/Users/teja_/OneDrive/41117backup/SHARWIN/Sharwin Academia/Third Year/STAT0017 - STS/Topic_1/pjnfunctions.R')
+# You will also need to load any R libraries that you want to use.
+# Some parts of the analyses are based on simulation.
+# We set a set a random number seed so that
+# 1. The numeric results on which you comments will not change each time you run
+#    your code (unless you change the order of the analyses)
+# 2. Your work is easier for me to mark.
+#### PLEASE DO NOT CHANGE THE FOLLOWING LINE OF CODE (KEEP THE SEED as 17) ####
 set.seed(17)
 ```
 
+---
+# [This is a comment block that will not appear in your PDF file]
+# Add your text (perhaps with LaTeX code in it) and R code in the 
+# relevant sections below.
+# There is an example of an R code `chunk' in the Winter maxima (wm) section
 ---
 
 # Extremal Types Example
 
 ${}$\hspace*{\fill} [25]
 
+---
+# You could put LaTeX code into this section to give your answer to Part A.
+# You can only use basic LaTeX code (no extra packages).
+# If you don't do this then please don't delete the Extremal Types Example
+# heading above: just leave this section blank.
 ---
 
 # Exploratory analysis
@@ -151,6 +168,16 @@ plot( M.winter_values, density.values, main = "pdf of fitted GEV distribution (9
 #
 plot(density(wm$M.winter),main = "Density plot of raw data (10)", cex.main = 1.5, 
      xlab = "Hs maximum / m",ylab = "density", cex.lab = 1.25);box(lwd = 2)
+
+plot( M.winter_values, density.values, main = "pdf of fitted GEV distribution (9)",
+      cex.main = 1.5, xlab = "Hs maximum / m", ylab = "density", cex.lab = 1.25);box(lwd = 2)
+
+#plot(density(wm$M.winter))
+#lines(density(M.winter_values))
+
+
+
+
 ```
 Figures 9 and 10:
 
@@ -367,9 +394,9 @@ Why GP instead of GEV?
 
 Why Bayesian instead of MLE?
 
-* MLE estimates are "best guesses" of the true paramters given the available historical information. Given another string of releasiations of data, this new set of data are equally representative of the true process being studied, and are likely to lead to a different set of estimates of the parameters. Considering extreme value modelling, small changes in the parameters can have great influences on extraplations of data.Therefore, I found it important to use an appraoch that constructs distributions for the parameters of the models themselves.
+* MLE estimates are "best guesses" of the true paramters given the available historical information. Given another string of releasiations of data, this new set of data are equally representative of the true process being studied, and are likely to lead to a different set of estimates of the parameters. Considering extreme value modelling, small changes in the parameters can have great influences on extrapolations of data.Therefore, I found it important to use an appraoch that constructs distributions for the parameters of the models themselves.
 
-* Another point to note is the opportunity available for the company to consult with metacoean experts and construct an informative prior, which develop the model to better suit the context and envrironment it's dealing with.
+* Another point to note is the opportunity available for the company to consult with metacoean experts and construct an informative prior, which develops the model to better suit the context and envrironment it's dealing with.
 
 Why not produce a CDF using the "best" threshold of 9.7992 ?
 
